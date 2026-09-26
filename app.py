@@ -89,7 +89,7 @@ def ask_rag(question):
   FROM context
   """
 
-  connection = get_connection()
+connection = get_connection()
 
 try:
     with connection.cursor() as cursor:
@@ -112,23 +112,23 @@ finally:
 
 
 if "messages" not in st.session_state:
-st.session_state.messages = []
+  st.session_state.messages = []
 
 for message in st.session_state.messages:
-with st.chat_message(message["role"]):
-st.markdown(message["content"])
+  with st.chat_message(message["role"]):
+    st.markdown(message["content"])
 
 question = st.chat_input(
 "Ask a question about the documentation..."
 )
 
 if question:
-st.session_state.messages.append(
-{
-"role": "user",
-"content": question
-}
-)
+  st.session_state.messages.append(
+  {
+  "role": "user",
+  "content": question
+  }
+  )
 
 with st.chat_message("user"):
     st.markdown(question)
