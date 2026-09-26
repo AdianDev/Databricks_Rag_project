@@ -103,9 +103,9 @@ try:
         result = cursor.fetchone()
 
         if result:
-            return result[0]
+          return result[0]
 
-        return "The retrieved documentation does not contain enough information to answer this question."
+    return "The retrieved documentation does not contain enough information to answer this question."
 
 finally:
     connection.close()
