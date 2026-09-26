@@ -64,54 +64,16 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# Databricks connection
+# Databricks SQL connection
 # -----------------------------------------------------------------------------
 
 def get_databricks_connection():
     """
     Create a Databricks SQL connection using the Databricks App
-    service-principal authentication.
-
-    This version also displays the names of Databricks-related
-    environment variables so we can determine how the SQL Warehouse
-    resource is exposed to the app.
-
-    IMPORTANT:
-    Only variable names are displayed.
-    Secret values are never displayed.
+    service principal and the SQL Warehouse resource.
     """
 
     cfg = Config()
-
-    # -------------------------------------------------------------------------
-    # Temporary diagnostic information
-    # -------------------------------------------------------------------------
-
-    databricks_environment_variables = sorted(
-        [
-            key
-            for key in os.environ.keys()
-            if "DATABRICKS" in key.upper()
-        ]
-    )
-
-    st.sidebar.subheader("Databricks diagnostics")
-
-    st.sidebar.write(
-        "Databricks-related environment variables detected:"
-    )
-
-    if databricks_environment_variables:
-        for key in databricks_environment_variables:
-            st.sidebar.code(key)
-    else:
-        st.sidebar.warning(
-            "No DATABRICKS_* environment variables were detected."
-        )
-
-    # -------------------------------------------------------------------------
-    # Workspace host
-    # -------------------------------------------------------------------------
 
     if not cfg.host:
         raise RuntimeError(
@@ -119,6 +81,17 @@ def get_databricks_connection():
             "from the Databricks App environment."
         )
 
+    # The SQL Warehouse resource in app.yaml provides this value.
+    warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+
+    if not warehouse_id:
+        raise RuntimeError(
+            "DATABRICKS_WAREHOUSE_ID is not available. "
+            "Make sure the SQL Warehouse resource is configured in "
+            "the Databricks App and referenced correctly in app.yaml."
+        )
+
+    # Remove protocol from workspace host if present.
     server_hostname = cfg.host
 
     if server_hostname.startswith("https://"):
@@ -129,35 +102,8 @@ def get_databricks_connection():
 
     server_hostname = server_hostname.rstrip("/")
 
-    # -------------------------------------------------------------------------
-    # SQL Warehouse HTTP path
-    # -------------------------------------------------------------------------
-    #
-    # We currently check the common environment variable names.
-    # After running the app, we will use the diagnostic output to determine
-    # the exact variable exposed by your Databricks App resource.
-    # -------------------------------------------------------------------------
-
-    http_path = os.getenv("DATABRICKS_HTTP_PATH")
-
-    if not http_path:
-        http_path = os.getenv(
-            "DATABRICKS_SQL_WAREHOUSE_HTTP_PATH"
-        )
-
-    if not http_path:
-        raise RuntimeError(
-            "No SQL Warehouse HTTP path was found in the Databricks App "
-            "environment.\n\n"
-            "The app is connected to the Databricks workspace, but the "
-            "SQL Warehouse HTTP path is not currently available under "
-            "DATABRICKS_HTTP_PATH or "
-            "DATABRICKS_SQL_WAREHOUSE_HTTP_PATH."
-        )
-
-    # -------------------------------------------------------------------------
-    # Create SQL connection
-    # -------------------------------------------------------------------------
+    # Databricks SQL Warehouse HTTP path.
+    http_path = f"/sql/1.0/warehouses/{warehouse_id}"
 
     return sql.connect(
         server_hostname=server_hostname,
@@ -256,15 +202,12 @@ FROM context
 
 
 # -----------------------------------------------------------------------------
-# RAG execution
+# Execute RAG
 # -----------------------------------------------------------------------------
 
 def ask_rag_assistant(question: str) -> str:
     """
-    Execute the complete RAG pipeline inside Databricks SQL.
-
-    Python submits the user's question as a bound parameter.
-    Databricks SQL performs:
+    Execute the RAG pipeline:
 
         User question
               ↓
@@ -274,7 +217,7 @@ def ask_rag_assistant(question: str) -> str:
               ↓
         Retrieved context
               ↓
-        ai_query()
+        databricks-gpt-oss-20b
               ↓
         Grounded answer
     """
@@ -284,7 +227,6 @@ def ask_rag_assistant(question: str) -> str:
 
     try:
         connection = get_databricks_connection()
-
         cursor = connection.cursor()
 
         cursor.execute(
@@ -312,7 +254,6 @@ def ask_rag_assistant(question: str) -> str:
         return response
 
     finally:
-
         if cursor is not None:
             try:
                 cursor.close()
@@ -327,11 +268,10 @@ def ask_rag_assistant(question: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-# Display existing conversation
+# Display previous messages
 # -----------------------------------------------------------------------------
 
 for message in st.session_state.messages:
-
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -355,10 +295,7 @@ if question:
 
     if question:
 
-        # ---------------------------------------------------------------------
         # Display user question
-        # ---------------------------------------------------------------------
-
         st.session_state.messages.append(
             {
                 "role": "user",
@@ -369,10 +306,7 @@ if question:
         with st.chat_message("user"):
             st.markdown(question)
 
-        # ---------------------------------------------------------------------
         # Generate answer
-        # ---------------------------------------------------------------------
-
         with st.chat_message("assistant"):
 
             with st.spinner(
@@ -380,7 +314,6 @@ if question:
             ):
 
                 try:
-
                     answer = ask_rag_assistant(question)
 
                     st.markdown(answer)
