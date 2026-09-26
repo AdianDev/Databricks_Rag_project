@@ -176,7 +176,7 @@ SELECT
 
       '11. Keep the answer concise and technically accurate.\\n\\n',
       '12. Also if asked provide a list of question which can be asked from you.',
-      '13. Tell about yourself when asked by the user and when telling about yourself state the answer within the rules.',
+      '13. when asked about yourself tell what you were designed to with 2-3 follow up question which can be asked from you.',
 
       'SOURCE CITATION FORMAT:\\n',
 
