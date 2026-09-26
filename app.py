@@ -30,8 +30,6 @@ FALLBACK_RESPONSE = (
     "to answer this question."
 )
 
-SQL_WAREHOUSE_HTTP_PATH_ENV = "DATABRICKS_HTTP_PATH"
-
 
 # -----------------------------------------------------------------------------
 # Session state
@@ -71,27 +69,49 @@ with st.sidebar:
 
 def get_databricks_connection():
     """
-    Create a Databricks SQL connection using the Databricks App service
-    principal and OAuth authentication.
+    Create a Databricks SQL connection using the Databricks App
+    service-principal authentication.
 
-    Databricks Apps automatically provides the service-principal credentials
-    through the environment and the Databricks SDK's Config object discovers
-    them automatically.
+    This version also displays the names of Databricks-related
+    environment variables so we can determine how the SQL Warehouse
+    resource is exposed to the app.
 
-    The SQL Warehouse HTTP path is expected to be supplied by the Databricks
-    App resource through DATABRICKS_HTTP_PATH.
+    IMPORTANT:
+    Only variable names are displayed.
+    Secret values are never displayed.
     """
 
-    http_path = os.getenv(SQL_WAREHOUSE_HTTP_PATH_ENV)
+    cfg = Config()
 
-    if not http_path:
-        raise RuntimeError(
-            "The SQL Warehouse HTTP path is not configured. "
-            "Configure the SQL Warehouse as a Databricks App resource and "
-            "expose its HTTP path as DATABRICKS_HTTP_PATH."
+    # -------------------------------------------------------------------------
+    # Temporary diagnostic information
+    # -------------------------------------------------------------------------
+
+    databricks_environment_variables = sorted(
+        [
+            key
+            for key in os.environ.keys()
+            if "DATABRICKS" in key.upper()
+        ]
+    )
+
+    st.sidebar.subheader("Databricks diagnostics")
+
+    st.sidebar.write(
+        "Databricks-related environment variables detected:"
+    )
+
+    if databricks_environment_variables:
+        for key in databricks_environment_variables:
+            st.sidebar.code(key)
+    else:
+        st.sidebar.warning(
+            "No DATABRICKS_* environment variables were detected."
         )
 
-    cfg = Config()
+    # -------------------------------------------------------------------------
+    # Workspace host
+    # -------------------------------------------------------------------------
 
     if not cfg.host:
         raise RuntimeError(
@@ -99,14 +119,45 @@ def get_databricks_connection():
             "from the Databricks App environment."
         )
 
-    # The SQL connector expects the workspace hostname rather than the
-    # https:// URL returned by the SDK configuration.
     server_hostname = cfg.host
+
     if server_hostname.startswith("https://"):
         server_hostname = server_hostname[len("https://"):]
+
     elif server_hostname.startswith("http://"):
         server_hostname = server_hostname[len("http://"):]
+
     server_hostname = server_hostname.rstrip("/")
+
+    # -------------------------------------------------------------------------
+    # SQL Warehouse HTTP path
+    # -------------------------------------------------------------------------
+    #
+    # We currently check the common environment variable names.
+    # After running the app, we will use the diagnostic output to determine
+    # the exact variable exposed by your Databricks App resource.
+    # -------------------------------------------------------------------------
+
+    http_path = os.getenv("DATABRICKS_HTTP_PATH")
+
+    if not http_path:
+        http_path = os.getenv(
+            "DATABRICKS_SQL_WAREHOUSE_HTTP_PATH"
+        )
+
+    if not http_path:
+        raise RuntimeError(
+            "No SQL Warehouse HTTP path was found in the Databricks App "
+            "environment.\n\n"
+            "The app is connected to the Databricks workspace, but the "
+            "SQL Warehouse HTTP path is not currently available under "
+            "DATABRICKS_HTTP_PATH or "
+            "DATABRICKS_SQL_WAREHOUSE_HTTP_PATH."
+        )
+
+    # -------------------------------------------------------------------------
+    # Create SQL connection
+    # -------------------------------------------------------------------------
 
     return sql.connect(
         server_hostname=server_hostname,
@@ -168,21 +219,27 @@ SELECT
       '4. Do not infer or invent technical details.\\n',
       '5. Do not interpret unexplained numbers or identifiers.\\n',
       '6. Every factual claim must be supported by the retrieved documentation.\\n',
+
       '7. Use the minimum number of source citations necessary to support the answer.\\n',
       '8. Prefer the most directly relevant page or pages over redundant citations.\\n',
       '9. Cite the document filename and page number for factual claims.\\n',
+
       '10. If the retrieved documentation does not contain enough information, ',
       'respond exactly: The retrieved documentation does not contain enough ',
       'information to answer this question.\\n',
+
       '11. Keep the answer concise and technically accurate.\\n\\n',
 
       'SOURCE CITATION FORMAT:\\n',
+
       'For one source, use exactly this style when appropriate:\\n',
       'Source: filename.pdf, page 9\\n\\n',
+
       'For multiple necessary sources, use exactly this style:\\n',
       'Sources:\\n',
       '- filename1.pdf, page 4\\n',
       '- filename2.pdf, page 9\\n\\n',
+
       'Only cite sources that directly support the factual claim.\\n',
       'Do not cite every retrieved chunk.\\n\\n',
 
@@ -206,9 +263,20 @@ def ask_rag_assistant(question: str) -> str:
     """
     Execute the complete RAG pipeline inside Databricks SQL.
 
-    Vector Search, context construction, and ai_query() all execute in
-    Databricks. Python only submits the user's question as a bound parameter
-    and retrieves the final response.
+    Python submits the user's question as a bound parameter.
+    Databricks SQL performs:
+
+        User question
+              ↓
+        Vector Search
+              ↓
+        Top 5 chunks
+              ↓
+        Retrieved context
+              ↓
+        ai_query()
+              ↓
+        Grounded answer
     """
 
     connection = None
@@ -216,13 +284,14 @@ def ask_rag_assistant(question: str) -> str:
 
     try:
         connection = get_databricks_connection()
+
         cursor = connection.cursor()
 
-        # Native parameter binding is used here. The SQL contains
-        # :question, and the value is supplied separately to execute().
         cursor.execute(
             RAG_SQL,
-            parameters={"question": question},
+            parameters={
+                "question": question
+            },
         )
 
         row = cursor.fetchone()
@@ -243,6 +312,7 @@ def ask_rag_assistant(question: str) -> str:
         return response
 
     finally:
+
         if cursor is not None:
             try:
                 cursor.close()
@@ -261,6 +331,7 @@ def ask_rag_assistant(question: str) -> str:
 # -----------------------------------------------------------------------------
 
 for message in st.session_state.messages:
+
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
@@ -274,11 +345,20 @@ question = st.chat_input(
 )
 
 
+# -----------------------------------------------------------------------------
+# Process question
+# -----------------------------------------------------------------------------
+
 if question:
+
     question = question.strip()
 
     if question:
-        # Store and immediately display the user's question.
+
+        # ---------------------------------------------------------------------
+        # Display user question
+        # ---------------------------------------------------------------------
+
         st.session_state.messages.append(
             {
                 "role": "user",
@@ -289,10 +369,18 @@ if question:
         with st.chat_message("user"):
             st.markdown(question)
 
-        # Execute the RAG pipeline.
+        # ---------------------------------------------------------------------
+        # Generate answer
+        # ---------------------------------------------------------------------
+
         with st.chat_message("assistant"):
-            with st.spinner("Searching the documentation and generating an answer..."):
+
+            with st.spinner(
+                "Searching the documentation and generating an answer..."
+            ):
+
                 try:
+
                     answer = ask_rag_assistant(question)
 
                     st.markdown(answer)
@@ -305,6 +393,7 @@ if question:
                     )
 
                 except Exception as exc:
+
                     user_message = (
                         "An error occurred while processing your question."
                     )
