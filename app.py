@@ -2,9 +2,7 @@ import streamlit as st
 from databricks import sql
 import os
 
----------------------------------------------------------
 Page configuration
----------------------------------------------------------
 
 st.set_page_config(
 page_title="Microcontroller RAG Assistant",
@@ -17,9 +15,7 @@ st.caption(
 "Ask questions about RP2040, RP2350 and related Raspberry Pi documentation."
 )
 
----------------------------------------------------------
 Databricks SQL connection
----------------------------------------------------------
 
 def get_connection():
 return sql.connect(
@@ -28,9 +24,7 @@ http_path=os.environ["DATABRICKS_HTTP_PATH"],
 access_token=os.environ["DATABRICKS_TOKEN"]
 )
 
----------------------------------------------------------
 RAG query
----------------------------------------------------------
 
 def ask_rag(question):
 
@@ -123,14 +117,15 @@ try:
         if result:
             return result[0]
 
-        return "The retrieved documentation does not contain enough information to answer this question."
+        return (
+            "The retrieved documentation does not contain enough "
+            "information to answer this question."
+        )
 
 finally:
     connection.close()
 
----------------------------------------------------------
-Chat history
----------------------------------------------------------
+Initialize chat history
 
 if "messages" not in st.session_state:
 st.session_state.messages = []
@@ -142,9 +137,7 @@ for message in st.session_state.messages:
 with st.chat_message(message["role"]):
     st.markdown(message["content"])
 
----------------------------------------------------------
 Chat input
----------------------------------------------------------
 
 question = st.chat_input(
 "Ask a question about the documentation..."
@@ -180,8 +173,7 @@ with st.chat_message("assistant"):
                 }
             )
 
-        except Exception as e:
-
+        except Exception:
             error_message = (
                 "Sorry, I couldn't process the question. "
                 "Please check the application configuration."
