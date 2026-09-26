@@ -2,8 +2,6 @@ import streamlit as st
 from databricks import sql
 import os
 
-Page configuration
-
 st.set_page_config(
 page_title="Microcontroller RAG Assistant",
 page_icon="🔧",
@@ -15,16 +13,12 @@ st.caption(
 "Ask questions about RP2040, RP2350 and related Raspberry Pi documentation."
 )
 
-Databricks SQL connection
-
 def get_connection():
 return sql.connect(
 server_hostname=os.environ["DATABRICKS_SERVER_HOSTNAME"],
 http_path=os.environ["DATABRICKS_HTTP_PATH"],
 access_token=os.environ["DATABRICKS_TOKEN"]
 )
-
-RAG query
 
 def ask_rag(question):
 
@@ -71,7 +65,6 @@ SELECT
     'databricks-gpt-oss-20b',
     CONCAT(
       'You are a technical documentation question-answering assistant.\\n\\n',
-
       'Answer the user question using ONLY the retrieved documentation.\\n\\n',
 
       'STRICT GROUNDING RULES:\\n',
@@ -104,7 +97,6 @@ connection = get_connection()
 
 try:
     with connection.cursor() as cursor:
-
         cursor.execute(
             query,
             parameters={
@@ -125,19 +117,13 @@ try:
 finally:
     connection.close()
 
-Initialize chat history
 
 if "messages" not in st.session_state:
 st.session_state.messages = []
 
-Display previous messages
-
 for message in st.session_state.messages:
-
 with st.chat_message(message["role"]):
-    st.markdown(message["content"])
-
-Chat input
+st.markdown(message["content"])
 
 question = st.chat_input(
 "Ask a question about the documentation..."
@@ -145,7 +131,6 @@ question = st.chat_input(
 
 if question:
 
-# Display user question
 st.session_state.messages.append(
     {
         "role": "user",
@@ -156,7 +141,6 @@ st.session_state.messages.append(
 with st.chat_message("user"):
     st.markdown(question)
 
-# Generate answer
 with st.chat_message("assistant"):
 
     with st.spinner("Searching the documentation..."):
@@ -173,7 +157,8 @@ with st.chat_message("assistant"):
                 }
             )
 
-        except Exception:
+        except Exception as e:
+
             error_message = (
                 "Sorry, I couldn't process the question. "
                 "Please check the application configuration."
