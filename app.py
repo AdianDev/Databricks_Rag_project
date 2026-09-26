@@ -21,10 +21,9 @@ access_token=os.environ["DATABRICKS_TOKEN"]
 )
 
 def ask_rag(question):
-
 query = """
 WITH params AS (
-  SELECT :question AS question
+SELECT :question AS question
 ),
 
 retrieved_chunks AS (
@@ -66,7 +65,6 @@ SELECT
     CONCAT(
       'You are a technical documentation question-answering assistant.\\n\\n',
       'Answer the user question using ONLY the retrieved documentation.\\n\\n',
-
       'STRICT GROUNDING RULES:\\n',
       '1. A retrieved chunk is not automatically evidence for the answer.\\n',
       '2. Only use information that directly answers the user question.\\n',
@@ -81,11 +79,9 @@ SELECT
       'respond exactly: The retrieved documentation does not contain enough ',
       'information to answer this question.\\n',
       '11. Keep the answer concise and technically accurate.\\n\\n',
-
       'USER QUESTION:\\n',
       (SELECT question FROM params),
       '\\n\\n',
-
       'RETRIEVED DOCUMENTATION:\\n',
       retrieved_context
     )
@@ -109,10 +105,7 @@ try:
         if result:
             return result[0]
 
-        return (
-            "The retrieved documentation does not contain enough "
-            "information to answer this question."
-        )
+        return "The retrieved documentation does not contain enough information to answer this question."
 
 finally:
     connection.close()
@@ -130,21 +123,18 @@ question = st.chat_input(
 )
 
 if question:
-
 st.session_state.messages.append(
-    {
-        "role": "user",
-        "content": question
-    }
+{
+"role": "user",
+"content": question
+}
 )
 
 with st.chat_message("user"):
     st.markdown(question)
 
 with st.chat_message("assistant"):
-
     with st.spinner("Searching the documentation..."):
-
         try:
             answer = ask_rag(question)
 
@@ -158,7 +148,6 @@ with st.chat_message("assistant"):
             )
 
         except Exception as e:
-
             error_message = (
                 "Sorry, I couldn't process the question. "
                 "Please check the application configuration."
