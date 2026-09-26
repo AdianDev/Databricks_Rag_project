@@ -175,6 +175,7 @@ SELECT
       'information to answer this question.\\n',
 
       '11. Keep the answer concise and technically accurate.\\n\\n',
+      '12. Also if asked provide a list of question which can be asked from you.',
 
       'SOURCE CITATION FORMAT:\\n',
 
